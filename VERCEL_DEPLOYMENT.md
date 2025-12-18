@@ -53,13 +53,14 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 1. [Vercel](https://vercel.com) पर login करें
 2. "New Project" → अपना repository select करें
-3. **Environment Variables** add करें:
-
-```env
-NEXT_PUBLIC_API_URL=https://your-backend-url.railway.app
-```
+3. **Environment Variables** add करें (Settings → Environment Variables):
+   - **Key**: `NEXT_PUBLIC_API_URL`
+   - **Value**: `https://your-backend-url.railway.app` (अपना actual backend URL डालें)
+   - **Environment**: Production, Preview, Development (सभी select करें)
 
 4. Deploy करें
+
+**Important**: Environment variables को Vercel dashboard में manually add करना होगा। `vercel.json` में environment variables define नहीं करें।
 
 ### 4. Backend में FRONTEND_URL Update करें
 
