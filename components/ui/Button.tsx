@@ -1,11 +1,10 @@
 'use client';
 
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
-import { type HTMLMotionProps, motion } from 'framer-motion';
+import { forwardRef, type ReactNode } from 'react';
+import { motion, type HTMLMotionProps } from 'framer-motion';
 
-type MotionButtonProps = ComponentPropsWithoutRef<typeof motion.button>;
-
-interface ButtonProps extends Omit<MotionButtonProps, 'children'> {
+// Omit conflicting props and extend with our custom ones
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
   children?: ReactNode;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
