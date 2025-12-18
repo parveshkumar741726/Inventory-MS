@@ -4,11 +4,12 @@ import { forwardRef, type ReactNode } from 'react';
 import { motion, type HTMLMotionProps } from 'framer-motion';
 
 // Omit conflicting props and extend with our custom ones
-interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children' | 'onAnimationStart'> {
   children?: ReactNode;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
+  onAnimationStart?: () => void;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -34,6 +35,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         whileTap={{ scale: 0.98 }}
         className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
         disabled={disabled || isLoading}
+        onAnimationStart={undefined}
         {...props}
       >
         {isLoading ? (
