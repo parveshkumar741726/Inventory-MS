@@ -24,8 +24,10 @@ export const authService = {
       localStorage.setItem('user', JSON.stringify(user));
       
       // Set cookies for middleware
-      document.cookie = `accessToken=${accessToken}; path=/; max-age=${60 * 60 * 24}`;
-      document.cookie = `refreshToken=${refreshToken}; path=/; max-age=${60 * 60 * 24 * 7}`;
+      const isProduction = window.location.protocol === 'https:';
+      const cookieOptions = `path=/; ${isProduction ? 'secure; ' : ''}SameSite=${isProduction ? 'None' : 'Lax'}`;
+      document.cookie = `accessToken=${accessToken}; ${cookieOptions}; max-age=${60 * 60 * 24}`;
+      document.cookie = `refreshToken=${refreshToken}; ${cookieOptions}; max-age=${60 * 60 * 24 * 7}`;
     }
     
     return response.data.data;
@@ -41,8 +43,10 @@ export const authService = {
       localStorage.setItem('user', JSON.stringify(user));
       
       // Set cookies for middleware
-      document.cookie = `accessToken=${accessToken}; path=/; max-age=${60 * 60 * 24}`;
-      document.cookie = `refreshToken=${refreshToken}; path=/; max-age=${60 * 60 * 24 * 7}`;
+      const isProduction = window.location.protocol === 'https:';
+      const cookieOptions = `path=/; ${isProduction ? 'secure; ' : ''}SameSite=${isProduction ? 'None' : 'Lax'}`;
+      document.cookie = `accessToken=${accessToken}; ${cookieOptions}; max-age=${60 * 60 * 24}`;
+      document.cookie = `refreshToken=${refreshToken}; ${cookieOptions}; max-age=${60 * 60 * 24 * 7}`;
     }
     
     return response.data.data;
