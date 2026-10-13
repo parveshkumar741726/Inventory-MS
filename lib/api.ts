@@ -11,9 +11,12 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      const isAuthRequest = config.url?.includes('/auth/login') || config.url?.includes('/auth/register');
+      if (!isAuthRequest) {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
     }
     return config;
@@ -27,12 +30,23 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const isAuthRequest = originalRequest?.url?.includes('/auth/');
 
-    if (error.response?.status === 401 && !originalRequest._retry && typeof window !== 'undefined') {
+    // Never try to refresh token if the failed request itself is an auth endpoint
+    if (
+      error.response?.status === 401 &&
+      !originalRequest?._retry &&
+      !isAuthRequest &&
+      typeof window !== 'undefined'
+    ) {
       originalRequest._retry = true;
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token');
+        }
+
         const response = await axios.post(`/api/auth/refresh-token`, {
           refreshToken,
         });

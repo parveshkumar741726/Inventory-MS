@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const jwtSecret = process.env.JWT_SECRET || 'inventory_management_secret_key_2024';
+    const decoded = jwt.verify(token, jwtSecret) as any;
     const user = await (User as any).findById(decoded.id);
 
     if (!user) {

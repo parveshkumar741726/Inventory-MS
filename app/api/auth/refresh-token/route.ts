@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || 'inventory_management_refresh_secret_key_2024';
+    const decoded = jwt.verify(refreshToken, refreshSecret) as any;
     const user = await (User as any).findById(decoded.id);
 
     if (!user || !user.isActive) {

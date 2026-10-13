@@ -31,6 +31,16 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  useState(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      document.cookie = 'accessToken=; path=/; max-age=0';
+      document.cookie = 'refreshToken=; path=/; max-age=0';
+    }
+  });
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
