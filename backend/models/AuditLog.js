@@ -39,4 +39,4 @@ auditLogSchema.index({ user: 1, createdAt: -1 });
 auditLogSchema.index({ entity: 1, entityId: 1 });
 auditLogSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('AuditLog', auditLogSchema);
+module.exports = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);

@@ -86,4 +86,4 @@ purchaseSchema.index({ vendor: 1 });
 purchaseSchema.index({ invoiceDate: -1 });
 purchaseSchema.index({ status: 1 });
 
-module.exports = mongoose.model('Purchase', purchaseSchema);
+module.exports = mongoose.models.Purchase || mongoose.model('Purchase', purchaseSchema);

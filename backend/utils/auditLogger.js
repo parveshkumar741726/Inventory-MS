@@ -5,11 +5,11 @@ const createAuditLog = async ({
   action,
   entity,
   entityId,
-  changes,
-  ipAddress,
-  userAgent,
-  description,
-}) => {
+  changes = null,
+  ipAddress = null,
+  userAgent = null,
+  description = '',
+} = {}) => {
   try {
     await AuditLog.create({
       user,

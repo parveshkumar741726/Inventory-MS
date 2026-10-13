@@ -54,4 +54,4 @@ const ledgerSchema = new mongoose.Schema({
 
 ledgerSchema.index({ vendor: 1, date: -1 });
 
-module.exports = mongoose.model('Ledger', ledgerSchema);
+module.exports = mongoose.models.Ledger || mongoose.model('Ledger', ledgerSchema);

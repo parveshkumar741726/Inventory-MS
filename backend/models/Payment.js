@@ -52,4 +52,4 @@ const paymentSchema = new mongoose.Schema({
 paymentSchema.index({ vendor: 1 });
 paymentSchema.index({ paymentDate: -1 });
 
-module.exports = mongoose.model('Payment', paymentSchema);
+module.exports = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);

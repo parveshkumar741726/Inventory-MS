@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-
+// Use relative URL so it works on Vercel (Next.js API Routes) and locally
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: `/api`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -34,7 +33,7 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
-        const response = await axios.post(`${API_URL}/api/auth/refresh-token`, {
+        const response = await axios.post(`/api/auth/refresh-token`, {
           refreshToken,
         });
 

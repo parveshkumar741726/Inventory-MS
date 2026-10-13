@@ -50,4 +50,4 @@ const purchaseItemSchema = new mongoose.Schema({
 purchaseItemSchema.index({ purchase: 1 });
 purchaseItemSchema.index({ item: 1 });
 
-module.exports = mongoose.model('PurchaseItem', purchaseItemSchema);
+module.exports = mongoose.models.PurchaseItem || mongoose.model('PurchaseItem', purchaseItemSchema);
