@@ -48,6 +48,7 @@ export async function PUT(
       currentStock,
       lastPurchaseRate,
       newPrice,
+      category,
       lastUpdatedDate,
     } = body;
 
@@ -68,6 +69,7 @@ export async function PUT(
     if (currentStock !== undefined) updateData.currentStock = currentStock;
     if (lastPurchaseRate !== undefined) updateData.lastPurchaseRate = lastPurchaseRate;
     if (newPrice !== undefined) updateData.newPrice = newPrice;
+    if (category !== undefined) updateData.category = category;
     if (lastUpdatedDate !== undefined) updateData.lastUpdatedDate = lastUpdatedDate;
 
     item = await (Item as any).findByIdAndUpdate(
@@ -79,6 +81,39 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       data: item,
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { user, errorResponse } = await authenticateRequest(request);
+  if (errorResponse) return errorResponse;
+
+  try {
+    const item = await (Item as any).findById(params.id);
+    if (!item) {
+      return NextResponse.json(
+        { success: false, message: 'Item not found' },
+        { status: 404 }
+      );
+    }
+
+    item.isDeleted = true;
+    item.deletedAt = new Date();
+    item.deletedBy = user!._id;
+    await item.save();
+
+    return NextResponse.json({
+      success: true,
+      message: 'Item deleted successfully',
     });
   } catch (error: any) {
     return NextResponse.json(

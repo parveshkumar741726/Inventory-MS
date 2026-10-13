@@ -72,18 +72,6 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    const currentBalance = await calculateVendorBalance(vendor);
-
-    if (amount > currentBalance) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Payment amount (${amount}) cannot exceed pending balance (${currentBalance})`,
-        },
-        { status: 400 }
-      );
-    }
-
     const payment = await (Payment as any).create({
       vendor,
       purchase: purchase || null,

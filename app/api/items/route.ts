@@ -53,7 +53,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    let { stockId, name, unit, minStockLevel } = body;
+    const {
+      name,
+      unit,
+      minStockLevel,
+      currentStock,
+      lastPurchaseRate,
+      newPrice,
+      category,
+    } = body;
+    let { stockId } = body;
 
     if (!stockId) {
       let isUnique = false;
@@ -69,8 +78,12 @@ export async function POST(request: NextRequest) {
     const item = await (Item as any).create({
       stockId,
       name,
-      unit,
-      minStockLevel: minStockLevel || 10,
+      unit: unit || 'pcs',
+      minStockLevel: minStockLevel !== undefined ? Number(minStockLevel) : 10,
+      currentStock: currentStock !== undefined ? Number(currentStock) : 0,
+      lastPurchaseRate: lastPurchaseRate !== undefined ? Number(lastPurchaseRate) : 0,
+      newPrice: newPrice !== undefined ? Number(newPrice) : (Number(lastPurchaseRate) || 0),
+      category: category || 'General',
       createdBy: user!._id,
     });
 

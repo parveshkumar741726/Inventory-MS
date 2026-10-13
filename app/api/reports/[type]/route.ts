@@ -224,7 +224,7 @@ export async function GET(
       });
     }
 
-    if (reportType === 'monthly-summary') {
+    if (reportType === 'monthly-summary' || reportType === 'monthly') {
       const year = searchParams.get('year');
       const monthStr = searchParams.get('month');
       const month = monthStr ? parseInt(monthStr) : undefined;

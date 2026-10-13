@@ -192,6 +192,26 @@ export default function PurchasesPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/purchases/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Purchase invoice deleted and stock reverted');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete purchase');
+    },
+  });
+
+  const handleDelete = (id: string, invoiceNumber: string) => {
+    if (confirm(`Are you sure you want to delete Invoice #${invoiceNumber}? Stock quantities will be automatically reverted.`)) {
+      deleteMutation.mutate(id);
+    }
+  };
+
   const onSubmit = async (data: PurchaseFormData) => {
     await createMutation.mutateAsync(data);
   };
@@ -429,6 +449,13 @@ export default function PurchasesPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </Link>
+                        <button
+                          onClick={() => handleDelete(purchase._id, purchase.invoiceNumber)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Delete Invoice"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
