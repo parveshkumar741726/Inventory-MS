@@ -3,13 +3,29 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Plus, Search, ShoppingCart, Eye, Upload } from 'lucide-react';
+import { 
+  Plus, 
+  Search, 
+  ShoppingCart, 
+  Eye, 
+  Upload, 
+  Trash2, 
+  CreditCard, 
+  Receipt, 
+  Calendar, 
+  Building2, 
+  Tag, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle,
+  FileSpreadsheet,
+  Percent,
+  SlidersHorizontal
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,6 +37,7 @@ const purchaseSchema = z.object({
   vendor: z.string().min(1, 'Vendor is required'),
   invoiceNumber: z.string().min(1, 'Invoice number is required'),
   invoiceDate: z.string().min(1, 'Invoice date is required'),
+  taxType: z.enum(['exclusive', 'inclusive']).default('exclusive'),
   damageQuantity: z.number().min(0).optional(),
   missingQuantity: z.number().min(0).optional(),
   remark: z.string().optional(),
@@ -29,6 +46,7 @@ const purchaseSchema = z.object({
     quantity: z.number().min(1, 'Quantity must be at least 1'),
     unit: z.string().min(1, 'Unit is required'),
     rate: z.number().min(0, 'Rate must be positive'),
+    discountPercent: z.number().min(0).max(100).optional().default(0),
     taxPercent: z.number().min(0).max(100, 'Tax must be between 0-100'),
   })).min(1, 'At least one item is required'),
 });
@@ -37,21 +55,21 @@ type PurchaseFormData = z.infer<typeof purchaseSchema>;
 
 export default function PurchasesPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<any>(null);
-  // Items are now managed by react-hook-form
   const queryClient = useQueryClient();
 
   const { data: purchases, isLoading } = useQuery({
-    queryKey: ['purchases', searchTerm],
+    queryKey: ['purchases', searchTerm, statusFilter],
     queryFn: async () => {
-      const response = await api.get('/purchases', {
-        params: { limit: 100 },
-      });
+      const params: any = { limit: 100 };
+      if (statusFilter !== 'all') params.status = statusFilter;
+      const response = await api.get('/purchases', { params });
       return response.data.data;
     },
   });
@@ -77,12 +95,70 @@ export default function PurchasesPage() {
       vendor: '',
       invoiceNumber: '',
       invoiceDate: new Date().toISOString().split('T')[0],
-      items: [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]
+      taxType: 'exclusive',
+      damageQuantity: 0,
+      missingQuantity: 0,
+      remark: '',
+      items: [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, discountPercent: 0, taxPercent: 18 }]
     }
   });
 
-  // Watch items to update form state
-  const formItems = watch('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
+  const formItems = watch('items') || [];
+  const selectedTaxType = watch('taxType') || 'exclusive';
+
+  // Live Bill Calculation Engine
+  const calculateBillSummary = () => {
+    let grossTotal = 0;
+    let totalDiscount = 0;
+    let taxableAmount = 0;
+    let totalTaxAmount = 0;
+
+    formItems.forEach((item) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      const taxPercent = Number(item.taxPercent) || 0;
+      const discPercent = Number(item.discountPercent) || 0;
+
+      const lineGross = qty * rate;
+      grossTotal += lineGross;
+
+      const lineDisc = (lineGross * discPercent) / 100;
+      totalDiscount += lineDisc;
+
+      const afterDisc = lineGross - lineDisc;
+
+      if (selectedTaxType === 'inclusive') {
+        const lineTaxable = afterDisc / (1 + taxPercent / 100);
+        const lineTax = afterDisc - lineTaxable;
+        taxableAmount += lineTaxable;
+        totalTaxAmount += lineTax;
+      } else {
+        const lineTaxable = afterDisc;
+        const lineTax = (lineTaxable * taxPercent) / 100;
+        taxableAmount += lineTaxable;
+        totalTaxAmount += lineTax;
+      }
+    });
+
+    const subtotal = Math.round(taxableAmount * 100) / 100;
+    const tax = Math.round(totalTaxAmount * 100) / 100;
+    const rawTotal = subtotal + tax;
+    const grandTotal = Math.round(rawTotal);
+    const roundOff = Math.round((grandTotal - rawTotal) * 100) / 100;
+
+    return {
+      grossTotal: Math.round(grossTotal * 100) / 100,
+      totalDiscount: Math.round(totalDiscount * 100) / 100,
+      taxableAmount: subtotal,
+      cgst: Math.round((tax / 2) * 100) / 100,
+      sgst: Math.round((tax / 2) * 100) / 100,
+      totalTax: tax,
+      roundOff,
+      grandTotal,
+    };
+  };
+
+  const billSummary = calculateBillSummary();
 
   const createMutation = useMutation({
     mutationFn: async (data: PurchaseFormData) => {
@@ -90,6 +166,7 @@ export default function PurchasesPage() {
       formData.append('vendor', data.vendor);
       formData.append('invoiceNumber', data.invoiceNumber);
       formData.append('invoiceDate', data.invoiceDate);
+      formData.append('taxType', data.taxType);
       formData.append('items', JSON.stringify(data.items || []));
       if (data.damageQuantity) formData.append('damageQuantity', data.damageQuantity.toString());
       if (data.missingQuantity) formData.append('missingQuantity', data.missingQuantity.toString());
@@ -104,12 +181,10 @@ export default function PurchasesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      toast.success('Purchase created successfully');
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast.success('Purchase invoice recorded successfully!');
       setIsModalOpen(false);
-      setIsEditMode(false);
-      setEditingPurchase(null);
       reset();
-      setValue('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
       setInvoiceFile(null);
     },
     onError: (error: any) => {
@@ -117,83 +192,27 @@ export default function PurchasesPage() {
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async (data: PurchaseFormData) => {
-      const formData = new FormData();
-      formData.append('vendor', data.vendor);
-      formData.append('invoiceNumber', data.invoiceNumber);
-      formData.append('invoiceDate', data.invoiceDate);
-      formData.append('items', JSON.stringify(data.items));
-      if (data.damageQuantity) formData.append('damageQuantity', data.damageQuantity.toString());
-      if (data.missingQuantity) formData.append('missingQuantity', data.missingQuantity.toString());
-      if (data.remark) formData.append('remark', data.remark);
-      if (invoiceFile) {
-        formData.append('invoiceFile', invoiceFile);
-      }
-      const response = await api.put(`/purchases/${editingPurchase._id}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      toast.success('Purchase updated successfully');
-      setIsModalOpen(false);
-      setIsEditMode(false);
-      setEditingPurchase(null);
-      reset();
-      setValue('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
-      setInvoiceFile(null);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update purchase');
-    },
-  });
-
   const onSubmit = async (data: PurchaseFormData) => {
-    console.log('Submitting form data:', data);
-    try {
-      if (isEditMode) {
-        await updateMutation.mutateAsync(data);
-      } else {
-        await createMutation.mutateAsync(data);
-      }
-    } catch (error) {
-      console.error('Error submitting form:', error);
-    }
+    await createMutation.mutateAsync(data);
   };
 
   const addItem = () => {
-    const currentItems = formItems || [];
-    setValue('items', [...currentItems, { itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
+    setValue('items', [
+      ...formItems,
+      { itemName: '', quantity: 1, unit: 'pcs', rate: 0, discountPercent: 0, taxPercent: 18 }
+    ]);
   };
 
   const removeItem = (index: number) => {
-    const currentItems = [...(formItems || [])];
-    currentItems.splice(index, 1);
-    setValue('items', currentItems);
+    const updated = [...formItems];
+    updated.splice(index, 1);
+    setValue('items', updated);
   };
 
-  const updateItem = (index: number, field: string, value: any) => {
-    const currentItems = [...(formItems || [])];
-    currentItems[index] = { ...currentItems[index], [field]: value };
-    setValue('items', currentItems);
-  };
-
-  const calculateTotal = () => {
-    return (formItems || []).reduce((total, item) => {
-      const quantity = Number(item.quantity) || 0;
-      const rate = Number(item.rate) || 0;
-      const taxPercent = Number(item.taxPercent) || 0;
-      const subtotal = quantity * rate;
-      const tax = (subtotal * taxPercent) / 100;
-      return total + subtotal + tax;
-    }, 0);
-  };
-
-  const handlePayment = (purchase: any) => {
-    setSelectedPurchase(purchase);
-    setIsPaymentModalOpen(true);
+  const updateItem = (index: number, field: string, val: any) => {
+    const updated = [...formItems];
+    updated[index] = { ...updated[index], [field]: val };
+    setValue('items', updated);
   };
 
   const handlePaymentSubmit = async (amount: number) => {
@@ -204,12 +223,11 @@ export default function PurchasesPage() {
         amount,
         paymentMode: 'cash',
         paymentDate: new Date().toISOString().split('T')[0],
-        notes: `Payment for invoice ${selectedPurchase.invoiceNumber}`,
+        notes: `Payment for invoice #${selectedPurchase.invoiceNumber}`,
       });
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      toast.success('Payment recorded successfully');
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast.success('Payment voucher recorded successfully');
       setIsPaymentModalOpen(false);
       setSelectedPurchase(null);
     } catch (error: any) {
@@ -217,463 +235,574 @@ export default function PurchasesPage() {
     }
   };
 
-  const handleEdit = async (purchase: any) => {
-    setIsEditMode(true);
-    setEditingPurchase(purchase);
+  // Filter purchases by search query
+  const filteredPurchases = (purchases || []).filter((p: any) => {
+    const matchesSearch = 
+      (p.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.vendor?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
 
-    // Fetch purchase with items
-    try {
-      const response = await api.get(`/purchases/${purchase._id}`);
-      const purchaseData = response.data.data;
-      const items = purchaseData.items || [];
-
-      // Pre-fill form with purchase data
-      setValue('vendor', purchase.vendor._id || purchase.vendor);
-      setValue('invoiceNumber', purchase.invoiceNumber);
-      setValue('invoiceDate', format(new Date(purchase.invoiceDate), 'yyyy-MM-dd'));
-      setValue('damageQuantity', purchase.damageQuantity || 0);
-      setValue('missingQuantity', purchase.missingQuantity || 0);
-      setValue('remark', purchase.remark || '');
-      setValue('items', items.map((item: any) => ({
-        itemName: item.itemName,
-        quantity: item.quantity,
-        unit: item.unit,
-        rate: item.rate,
-        taxPercent: item.taxPercent,
-      })));
-
-      setIsModalOpen(true);
-    } catch (error) {
-      console.error('Edit error:', error);
-      toast.error('Failed to load purchase details');
-    }
-  };
+  // Calculate top bar metrics
+  const totalBillAmount = (purchases || []).reduce((acc: number, p: any) => acc + (p.total || 0), 0);
+  const totalPendingAmount = (purchases || []).reduce((acc: number, p: any) => acc + (p.pendingAmount || 0), 0);
+  const totalPaidAmount = (purchases || []).reduce((acc: number, p: any) => acc + (p.paidAmount || 0), 0);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Top Header & Metrics Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/60">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Purchases</h1>
-          <p className="text-gray-600 mt-1">Track and manage all purchases</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+            <ShoppingCart className="w-7 h-7 text-indigo-400" />
+            Purchase Invoices & Bills
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">Manage vendor procurement, GST tax calculations, and invoices</p>
         </div>
-        <Button onClick={() => {
-          setIsEditMode(false);
-          setEditingPurchase(null);
-          reset();
-          setValue('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
-          setIsModalOpen(true);
-        }} className="w-full sm:w-auto">
-          <Plus className="w-5 h-5 mr-2" />
-          Add Purchase
-        </Button>
+
+        <button
+          onClick={() => {
+            reset();
+            setValue('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, discountPercent: 0, taxPercent: 18 }]);
+            setIsModalOpen(true);
+          }}
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <Plus className="w-5 h-5" />
+          Create Purchase Bill
+        </button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search purchases..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+      {/* Summary KPI Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Procurement</p>
+            <p className="text-xl sm:text-2xl font-black text-white mt-1">₹{totalBillAmount.toLocaleString('en-IN')}</p>
+            <p className="text-[11px] text-slate-500">{purchases?.length || 0} Bills Total</p>
           </div>
-        </CardHeader>
-        <CardBody className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
-            </div>
-          ) : purchases && purchases.length > 0 ? (
-            <>
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pending</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {purchases.map((purchase: any) => (
-                      <tr key={purchase._id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-900">{purchase.invoiceNumber}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">{purchase.vendor?.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                          {format(new Date(purchase.invoiceDate), 'MMM dd, yyyy')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-semibold text-gray-900">₹{purchase.total.toLocaleString()}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-green-600">₹{purchase.paidAmount.toLocaleString()}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-semibold text-red-600">₹{(purchase.total - purchase.paidAmount).toLocaleString()}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${purchase.status === 'paid' ? 'bg-green-100 text-green-800' :
-                              purchase.status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                            }`}>
-                            {purchase.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex items-center gap-2 justify-end">
-                            <Link href={`/purchases/${purchase._id}`}>
-                              <Button variant="ghost" size="sm" title="View Details">
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </Link>
+          <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <Receipt className="w-5 h-5" />
+          </div>
+        </div>
 
-                            <button
-                              onClick={() => handleEdit(purchase)}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                            >
-                              Edit
-                            </button>
-                            {purchase.status !== 'paid' && (
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => handlePayment(purchase)}
-                              >
-                                Pay
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Paid to Vendors</p>
+            <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">₹{totalPaidAmount.toLocaleString('en-IN')}</p>
+            <p className="text-[11px] text-slate-500">Successfully Cleared</p>
+          </div>
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
 
-              <div className="lg:hidden divide-y divide-gray-200">
-                {purchases.map((purchase: any) => (
-                  <div key={purchase._id} className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{purchase.invoiceNumber}</h3>
-                        <p className="text-sm text-gray-600">{purchase.vendor?.name}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {format(new Date(purchase.invoiceDate), 'MMM dd, yyyy')}
-                        </p>
+        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Payables</p>
+            <p className="text-xl sm:text-2xl font-black text-rose-400 mt-1">₹{totalPendingAmount.toLocaleString('en-IN')}</p>
+            <p className="text-[11px] text-slate-500">Due to Suppliers</p>
+          </div>
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by invoice number or vendor name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-850/80 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          {['all', 'pending', 'partial', 'paid'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
+                statusFilter === status
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Invoices List / Table */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm mt-3 font-medium">Fetching invoices...</p>
+        </div>
+      ) : filteredPurchases.length > 0 ? (
+        <div className="rounded-2xl bg-slate-900/70 border border-slate-800/80 overflow-hidden shadow-xl backdrop-blur-xl">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="text-xs uppercase bg-slate-800/60 text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th className="px-5 py-3.5 font-bold">Invoice Details</th>
+                  <th className="px-5 py-3.5 font-bold">Vendor</th>
+                  <th className="px-5 py-3.5 font-bold">Tax Type</th>
+                  <th className="px-5 py-3.5 font-bold text-right">Taxable</th>
+                  <th className="px-5 py-3.5 font-bold text-right">GST Tax</th>
+                  <th className="px-5 py-3.5 font-bold text-right">Grand Total</th>
+                  <th className="px-5 py-3.5 font-bold text-center">Status</th>
+                  <th className="px-5 py-3.5 font-bold text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {filteredPurchases.map((purchase: any) => (
+                  <tr key={purchase._id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="font-bold text-white">#{purchase.invoiceNumber}</div>
+                      <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" />
+                        {format(new Date(purchase.invoiceDate), 'dd MMM yyyy')}
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${purchase.status === 'paid' ? 'bg-green-100 text-green-800' :
-                          purchase.status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                        }`}>
-                        {purchase.status}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-semibold text-white">{purchase.vendor?.name || 'Unknown'}</div>
+                      <div className="text-xs text-slate-400">{purchase.vendor?.phone || 'No phone'}</div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold uppercase border ${
+                        purchase.taxType === 'inclusive'
+                          ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                          : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                      }`}>
+                        {purchase.taxType || 'Exclusive'}
                       </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div>
-                        <p className="text-sm text-gray-600">Total: <span className="font-semibold text-gray-900">₹{purchase.total.toLocaleString()}</span></p>
-                        <p className="text-sm text-gray-600">Paid: <span className="text-green-600">₹{purchase.paidAmount.toLocaleString()}</span></p>
-                        <p className="text-sm text-gray-600">Pending: <span className="font-semibold text-red-600">₹{(purchase.total - purchase.paidAmount).toLocaleString()}</span></p>
+                    </td>
+                    <td className="px-5 py-4 text-right font-medium text-slate-300">
+                      ₹{(purchase.subtotal || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-5 py-4 text-right font-medium text-indigo-300">
+                      +₹{(purchase.totalTax || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="font-extrabold text-white text-base">
+                        ₹{(purchase.total || 0).toLocaleString('en-IN')}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(purchase)}
-                          className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                      <div className="text-[11px] text-rose-400 font-semibold">
+                        Due: ₹{(purchase.pendingAmount || 0).toLocaleString('en-IN')}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize border ${
+                        purchase.status === 'paid'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : purchase.status === 'partial'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}>
+                        {purchase.status || 'Pending'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {purchase.pendingAmount > 0 && (
+                          <button
+                            onClick={() => {
+                              setSelectedPurchase(purchase);
+                              setIsPaymentModalOpen(true);
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 transition-all"
+                          >
+                            Pay
+                          </button>
+                        )}
+                        <Link 
+                          href={`/purchases/${purchase._id}`}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                          title="View Details"
                         >
-                          Edit
-                        </button>
-                        <Link href={`/purchases/${purchase._id}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                          <Eye className="w-4 h-4" />
                         </Link>
                       </div>
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              icon={ShoppingCart}
-              title="No purchases found"
-              description="Start by adding your first purchase"
-              action={{ label: 'Add Purchase', onClick: () => setIsModalOpen(true) }}
-            />
-          )}
-        </CardBody>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="p-12 text-center rounded-2xl bg-slate-900/50 border border-slate-800 text-slate-400">
+          <ShoppingCart className="w-12 h-12 stroke-[1.5] mx-auto mb-3 opacity-30 text-indigo-400" />
+          <h3 className="text-base font-bold text-white">No Purchase Invoices Found</h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            {searchTerm ? 'No invoices match your search filters.' : 'Get started by creating your first purchase bill.'}
+          </p>
+        </div>
+      )}
 
+      {/* CREATE PURCHASE BILL MODAL WITH LIVE CALCULATION ENGINE */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
-          setIsEditMode(false);
-          setEditingPurchase(null);
           reset();
-          setValue('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
           setInvoiceFile(null);
         }}
-        title={isEditMode ? "Edit Purchase" : "Add New Purchase"}
+        title="Create New Purchase Bill (GST Invoice)"
         size="xl"
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" encType="multipart/form-data">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6 text-slate-200">
+          {/* Header Details */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Vendor / Supplier *
+              </label>
               <select
                 {...register('vendor')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Select Vendor</option>
-                {vendors?.map((vendor: any) => (
-                  <option key={vendor._id} value={vendor._id}>{vendor.name}</option>
+                {vendors?.map((v: any) => (
+                  <option key={v._id} value={v._id}>{v.name} ({v.firmName || 'Vendor'})</option>
                 ))}
               </select>
-              {errors.vendor && <p className="mt-1 text-sm text-red-600">{errors.vendor.message as string}</p>}
+              {errors.vendor && <p className="mt-1 text-xs text-rose-400">{errors.vendor.message}</p>}
             </div>
-            <Input
-              label="Invoice Number *"
-              placeholder="INV-001"
-              error={errors.invoiceNumber?.message as string}
-              {...register('invoiceNumber')}
-            />
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Invoice Number *
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. INV-2024-001"
+                {...register('invoiceNumber')}
+                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {errors.invoiceNumber && <p className="mt-1 text-xs text-rose-400">{errors.invoiceNumber.message}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Invoice Date *
+              </label>
+              <input
+                type="date"
+                {...register('invoiceDate')}
+                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Invoice Date *"
-              type="date"
-              error={errors.invoiceDate?.message as string}
-              {...register('invoiceDate')}
-            />
+          {/* Tax Mode Selector & File Upload */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Invoice File</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                GST Tax Calculation Mode *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs font-bold transition-all ${
+                  selectedTaxType === 'exclusive'
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                }`}>
+                  <input
+                    type="radio"
+                    value="exclusive"
+                    {...register('taxType')}
+                    className="sr-only"
+                  />
+                  <span>Exclusive (Base + GST)</span>
+                </label>
+
+                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs font-bold transition-all ${
+                  selectedTaxType === 'inclusive'
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                }`}>
+                  <input
+                    type="radio"
+                    value="inclusive"
+                    {...register('taxType')}
+                    className="sr-only"
+                  />
+                  <span>Inclusive (MRP includes GST)</span>
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {selectedTaxType === 'exclusive' 
+                  ? 'Rate is base price; GST tax is added on top.' 
+                  : 'Rate already includes GST tax; base taxable amount is extracted.'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                Attach Bill / Invoice Scan
+              </label>
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={(e) => setInvoiceFile(e.target.files?.[0] || null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-800 border border-slate-700 rounded-xl p-1"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Damage Quantity"
-              type="number"
-              placeholder="0"
-              error={errors.damageQuantity?.message as string}
-              {...register('damageQuantity', { valueAsNumber: true })}
-            />
-            <Input
-              label="Missing Quantity"
-              type="number"
-              placeholder="0"
-              error={errors.missingQuantity?.message as string}
-              {...register('missingQuantity', { valueAsNumber: true })}
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Remark</label>
-              <input
-                type="text"
-                placeholder="Add remark..."
-                {...register('remark')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Items</h3>
-              <Button type="button" onClick={addItem} size="sm">
-                <Plus className="w-4 h-4 mr-1" />
+          {/* Items Table */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Receipt className="w-4 h-4 text-indigo-400" />
+                Line Items
+              </h3>
+              <button
+                type="button"
+                onClick={addItem}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20"
+              >
+                <Plus className="w-3.5 h-3.5" />
                 Add Item
-              </Button>
+              </button>
             </div>
 
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {formItems?.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-start p-3 bg-gray-50 rounded-lg">
-                  <div className="col-span-12 md:col-span-3">
-                    <input
-                      type="text"
-                      placeholder="Item name"
-                      value={item.itemName || ''}
-                      onChange={(e) => updateItem(index, 'itemName', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
-                  <div className="col-span-6 md:col-span-2">
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      value={item.quantity || ''}
-                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      min="1"
-                      step="1"
-                    />
-                  </div>
-                  <div className="col-span-6 md:col-span-2">
-                    <select
-                      value={item.unit || 'pcs'}
-                      onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    >
-                      <option value="pcs">pcs</option>
-                      <option value="kg">kg</option>
-                      <option value="g">g</option>
-                      <option value="l">l</option>
-                      <option value="m">m</option>
-                      <option value="box">box</option>
-                    </select>
-                  </div>
-                  <div className="col-span-6 md:col-span-2">
-                    <input
-                      type="number"
-                      placeholder="Rate"
-                      value={item.rate || ''}
-                      onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-5 md:col-span-2">
-                    <input
-                      type="number"
-                      placeholder="Tax %"
-                      value={item.taxPercent || ''}
-                      onChange={(e) => updateItem(index, 'taxPercent', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    {(formItems?.length || 0) > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-700 text-sm"
+            <div className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
+              {formItems.map((item, index) => {
+                const qty = Number(item.quantity) || 0;
+                const rate = Number(item.rate) || 0;
+                const taxP = Number(item.taxPercent) || 0;
+                const discP = Number(item.discountPercent) || 0;
+                const gross = qty * rate;
+                const disc = (gross * discP) / 100;
+                const netAfterDisc = gross - disc;
+                const rowTotal = selectedTaxType === 'inclusive' 
+                  ? netAfterDisc 
+                  : netAfterDisc + (netAfterDisc * taxP) / 100;
+
+                return (
+                  <div key={index} className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 grid grid-cols-12 gap-2.5 items-center">
+                    <div className="col-span-12 sm:col-span-3">
+                      <label className="text-[10px] font-semibold text-slate-400">Item Name</label>
+                      <input
+                        type="text"
+                        placeholder="Item Description"
+                        value={item.itemName || ''}
+                        onChange={(e) => updateItem(index, 'itemName', e.target.value)}
+                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div className="col-span-4 sm:col-span-2">
+                      <label className="text-[10px] font-semibold text-slate-400">Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={item.quantity || ''}
+                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div className="col-span-4 sm:col-span-1">
+                      <label className="text-[10px] font-semibold text-slate-400">Unit</label>
+                      <select
+                        value={item.unit || 'pcs'}
+                        onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                        className="w-full mt-0.5 px-1.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       >
-                        ×
-                      </button>
-                    )}
+                        <option value="pcs">pcs</option>
+                        <option value="kg">kg</option>
+                        <option value="box">box</option>
+                        <option value="m">m</option>
+                        <option value="l">l</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-4 sm:col-span-2">
+                      <label className="text-[10px] font-semibold text-slate-400">Rate (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={item.rate || ''}
+                        onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div className="col-span-4 sm:col-span-1">
+                      <label className="text-[10px] font-semibold text-slate-400">Disc %</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={item.discountPercent || ''}
+                        placeholder="0"
+                        onChange={(e) => updateItem(index, 'discountPercent', parseFloat(e.target.value) || 0)}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div className="col-span-4 sm:col-span-1">
+                      <label className="text-[10px] font-semibold text-slate-400">GST %</label>
+                      <select
+                        value={item.taxPercent || 18}
+                        onChange={(e) => updateItem(index, 'taxPercent', parseFloat(e.target.value) || 0)}
+                        className="w-full mt-0.5 px-1 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="0">0%</option>
+                        <option value="5">5%</option>
+                        <option value="12">12%</option>
+                        <option value="18">18%</option>
+                        <option value="28">28%</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-3 sm:col-span-1 text-right">
+                      <label className="text-[10px] font-semibold text-slate-400 block">Total</label>
+                      <p className="text-xs font-bold text-white mt-1">₹{Math.round(rowTotal)}</p>
+                    </div>
+
+                    <div className="col-span-1 text-center">
+                      {formItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="text-rose-400 hover:text-rose-300 p-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* LIVE BILL CALCULATION SUMMARY WIDGET */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-500/30 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 pb-2 border-b border-slate-800">
+              Invoice Calculation Summary (GST Breakdown)
+            </h4>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+              <div>
+                <p className="text-slate-400">Gross Amount:</p>
+                <p className="font-semibold text-white">₹{billSummary.grossTotal.toLocaleString('en-IN')}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Total Discount:</p>
+                <p className="font-semibold text-amber-400">-₹{billSummary.totalDiscount.toLocaleString('en-IN')}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Taxable Value:</p>
+                <p className="font-semibold text-white">₹{billSummary.taxableAmount.toLocaleString('en-IN')}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Total GST Tax:</p>
+                <p className="font-semibold text-indigo-400">+₹{billSummary.totalTax.toLocaleString('en-IN')}</p>
+              </div>
             </div>
 
-            <div className="mt-4 p-3 bg-primary-50 rounded-lg">
-              {errors.items && (
-                <p className="text-red-600 text-sm mb-2">
-                  {errors.items.message as string}
-                </p>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-900">Total Amount:</span>
-                <span className="text-xl font-bold text-primary-600">₹{calculateTotal().toLocaleString()}</span>
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
+              <div className="text-xs text-slate-400">
+                <span>Round Off: </span>
+                <span className="font-semibold text-slate-300">
+                  {billSummary.roundOff >= 0 ? `+₹${billSummary.roundOff}` : `-₹${Math.abs(billSummary.roundOff)}`}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold mr-2">Grand Total:</span>
+                <span className="text-2xl font-black text-emerald-400">₹{billSummary.grandTotal.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button
+          {/* Form Actions */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <button
               type="button"
-              variant="secondary"
-              onClick={() => {
-                setIsModalOpen(false);
-                reset();
-                setValue('items', [{ itemName: '', quantity: 1, unit: 'pcs', rate: 0, taxPercent: 0 }]);
-                setInvoiceFile(null);
-              }}
-              className="flex-1"
+              onClick={() => setIsModalOpen(false)}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-750 transition-colors"
             >
               Cancel
-            </Button>
-            <Button
+            </button>
+            <button
               type="submit"
-              isLoading={createMutation.isPending || updateMutation.isPending}
-              className="flex-1"
+              disabled={createMutation.isPending}
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
             >
-              {isEditMode ? 'Update Purchase' : 'Create Purchase'}
-            </Button>
+              {createMutation.isPending ? 'Saving Invoice...' : 'Confirm & Save Purchase Bill'}
+            </button>
           </div>
         </form>
       </Modal>
 
+      {/* QUICK PAYMENT MODAL */}
       <Modal
         isOpen={isPaymentModalOpen}
         onClose={() => {
           setIsPaymentModalOpen(false);
           setSelectedPurchase(null);
         }}
-        title="Record Payment"
+        title="Record Supplier Payment"
         size="md"
       >
         {selectedPurchase && (
-          <div className="p-6 space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Purchase Details</h4>
-              <div className="space-y-1 text-sm">
-                <p><span className="text-gray-600">Vendor:</span> <span className="font-medium">{selectedPurchase.vendor?.name}</span></p>
-                <p><span className="text-gray-600">Invoice:</span> <span className="font-medium">{selectedPurchase.invoiceNumber}</span></p>
-                <p><span className="text-gray-600">Total Amount:</span> <span className="font-semibold text-gray-900">₹{selectedPurchase.total?.toLocaleString()}</span></p>
-                <p><span className="text-gray-600">Paid Amount:</span> <span className="text-green-600">₹{selectedPurchase.paidAmount?.toLocaleString()}</span></p>
-                <p><span className="text-gray-600">Pending Amount:</span> <span className="font-bold text-red-600">₹{selectedPurchase.pendingAmount?.toLocaleString()}</span></p>
+          <div className="p-6 space-y-4 text-slate-200">
+            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1.5 text-sm">
+              <p className="text-slate-400">Vendor: <span className="font-bold text-white">{selectedPurchase.vendor?.name}</span></p>
+              <p className="text-slate-400">Invoice: <span className="font-semibold text-white">#{selectedPurchase.invoiceNumber}</span></p>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-700/60 mt-2">
+                <span className="text-slate-400">Pending Payable:</span>
+                <span className="text-lg font-black text-rose-400">₹{selectedPurchase.pendingAmount?.toLocaleString('en-IN')}</span>
               </div>
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount *</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Payment Amount (₹)
+              </label>
               <input
                 type="number"
-                id="paymentAmount"
+                id="modalPaymentAmount"
+                defaultValue={selectedPurchase.pendingAmount}
                 max={selectedPurchase.pendingAmount}
-                placeholder="Enter amount"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <p className="text-xs text-gray-500 mt-1">Maximum: ₹{selectedPurchase.pendingAmount?.toLocaleString()}</p>
+              <p className="text-[11px] text-slate-400 mt-1">Maximum payable: ₹{selectedPurchase.pendingAmount?.toLocaleString('en-IN')}</p>
             </div>
-            <div className="flex gap-3 pt-4">
-              <Button
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
                 type="button"
-                variant="secondary"
-                onClick={() => {
-                  setIsPaymentModalOpen(false);
-                  setSelectedPurchase(null);
-                }}
-                className="flex-1"
+                onClick={() => setIsPaymentModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
                 onClick={() => {
-                  const input = document.getElementById('paymentAmount') as HTMLInputElement;
-                  const amount = parseFloat(input?.value || '0');
-                  if (amount > 0 && amount <= selectedPurchase.pendingAmount) {
-                    handlePaymentSubmit(amount);
-                  } else {
-                    toast.error('Please enter a valid amount');
-                  }
+                  const input = document.getElementById('modalPaymentAmount') as HTMLInputElement;
+                  const val = parseFloat(input?.value || '0');
+                  if (val > 0) handlePaymentSubmit(val);
                 }}
-                className="flex-1"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 transition-all"
               >
-                Record Payment
-              </Button>
+                Confirm Payment
+              </button>
             </div>
           </div>
         )}

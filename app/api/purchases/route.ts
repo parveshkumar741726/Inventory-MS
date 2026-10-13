@@ -123,23 +123,54 @@ export async function POST(request: NextRequest) {
     const parsedItems: any[] = JSON.parse(itemsStr || '[]');
     let subtotal = 0;
     let totalTax = 0;
+    let totalDiscount = 0;
 
-    parsedItems.forEach((item) => {
+    const calculatedItems = parsedItems.map((item) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      const taxPercent = Number(item.taxPercent) || 0;
+      const discountPercent = Number(item.discountPercent) || 0;
+
+      const gross = Math.round(qty * rate * 100) / 100;
+      const itemDiscount = Math.round(((gross * discountPercent) / 100) * 100) / 100;
+      totalDiscount += itemDiscount;
+
+      let itemSubtotal: number;
+      let itemTax: number;
+      let itemTotal: number;
+
       if (taxType === 'inclusive') {
-        const itemTotal = item.quantity * item.rate;
-        const itemSubtotal = itemTotal / (1 + (item.taxPercent || 0) / 100);
-        const itemTax = itemTotal - itemSubtotal;
-        subtotal += itemSubtotal;
-        totalTax += itemTax;
+        itemTotal = Math.round((gross - itemDiscount) * 100) / 100;
+        itemSubtotal = Math.round((itemTotal / (1 + taxPercent / 100)) * 100) / 100;
+        itemTax = Math.round((itemTotal - itemSubtotal) * 100) / 100;
       } else {
-        const itemSubtotal = item.quantity * item.rate;
-        const itemTax = (itemSubtotal * (item.taxPercent || 0)) / 100;
-        subtotal += itemSubtotal;
-        totalTax += itemTax;
+        itemSubtotal = Math.round((gross - itemDiscount) * 100) / 100;
+        itemTax = Math.round(((itemSubtotal * taxPercent) / 100) * 100) / 100;
+        itemTotal = Math.round((itemSubtotal + itemTax) * 100) / 100;
       }
+
+      subtotal += itemSubtotal;
+      totalTax += itemTax;
+
+      return {
+        ...item,
+        quantity: qty,
+        rate,
+        taxPercent,
+        discountPercent,
+        discountAmount: itemDiscount,
+        itemSubtotal,
+        itemTax,
+        itemTotal,
+      };
     });
 
-    const total = subtotal + totalTax;
+    subtotal = Math.round(subtotal * 100) / 100;
+    totalTax = Math.round(totalTax * 100) / 100;
+    const rawTotal = subtotal + totalTax;
+    const roundedTotal = Math.round(rawTotal);
+    const roundOff = Math.round((roundedTotal - rawTotal) * 100) / 100;
+    const total = roundedTotal;
 
     const purchase = await (Purchase as any).create({
       vendor,
@@ -149,6 +180,8 @@ export async function POST(request: NextRequest) {
       taxType,
       subtotal,
       totalTax,
+      discount: totalDiscount,
+      roundOff,
       total,
       pendingAmount: total,
       notes,
@@ -158,7 +191,7 @@ export async function POST(request: NextRequest) {
       createdBy: user!._id,
     });
 
-    for (const itemData of parsedItems) {
+    for (const itemData of calculatedItems) {
       let item = await (Item as any).findOne({ name: itemData.itemName, isDeleted: false });
 
       if (!item) {
@@ -174,20 +207,6 @@ export async function POST(request: NextRequest) {
       item.lastPurchaseRate = itemData.rate;
       await item.save();
 
-      let itemSubtotal: number;
-      let itemTax: number;
-      let itemTotal: number;
-
-      if (taxType === 'inclusive') {
-        itemTotal = itemData.quantity * itemData.rate;
-        itemSubtotal = itemTotal / (1 + (itemData.taxPercent || 0) / 100);
-        itemTax = itemTotal - itemSubtotal;
-      } else {
-        itemSubtotal = itemData.quantity * itemData.rate;
-        itemTax = (itemSubtotal * (itemData.taxPercent || 0)) / 100;
-        itemTotal = itemSubtotal + itemTax;
-      }
-
       await (PurchaseItem as any).create({
         purchase: purchase._id,
         item: item._id,
@@ -196,9 +215,9 @@ export async function POST(request: NextRequest) {
         unit: itemData.unit,
         rate: itemData.rate,
         taxPercent: itemData.taxPercent || 0,
-        taxAmount: itemTax,
-        subtotal: itemSubtotal,
-        total: itemTotal,
+        taxAmount: itemData.itemTax,
+        subtotal: itemData.itemSubtotal,
+        total: itemData.itemTotal,
       });
     }
 

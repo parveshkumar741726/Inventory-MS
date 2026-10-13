@@ -11,39 +11,63 @@ export async function GET(request: NextRequest) {
 
   try {
     const totalVendors = await (Vendor as any).countDocuments({ status: 'active', isDeleted: false });
-    const totalPurchases = await (Purchase as any).countDocuments();
+    const totalPurchases = await (Purchase as any).countDocuments({ isDeleted: false });
 
-    const pendingPaymentsData = await (Purchase as any).aggregate([
-      { $match: { status: { $in: ['pending', 'partial'] } } },
-      { $group: { _id: null, total: { $sum: '$pendingAmount' } } },
-    ]);
-    const pendingPayments = pendingPaymentsData[0]?.total || 0;
+    // Calculate accurate pending payable balance across all vendors
+    const vendors = await (Vendor as any).find({ isDeleted: false });
+    const { calculateVendorBalance } = require('@/backend/utils/ledgerHelper');
+    let totalPendingPayable = 0;
+    for (const v of vendors) {
+      const bal = await calculateVendorBalance(v._id);
+      if (bal > 0) {
+        totalPendingPayable += bal;
+      }
+    }
 
     const lowStockItems = await (Item as any).countDocuments({
+      isDeleted: false,
       $expr: { $lte: ['$currentStock', '$minStockLevel'] }
     });
 
-    const totalPurchaseAmount = await (Purchase as any).aggregate([
+    const totalPurchaseAmountData = await (Purchase as any).aggregate([
+      { $match: { isDeleted: false } },
       { $group: { _id: null, total: { $sum: '$total' } } },
     ]);
+    const totalPurchaseAmount = totalPurchaseAmountData[0]?.total || 0;
 
-    const totalPayments = await (Payment as any).aggregate([
+    const totalPaymentsData = await (Payment as any).aggregate([
+      { $match: { isDeleted: false } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
+    const totalPayments = totalPaymentsData[0]?.total || 0;
 
-    const recentPurchases = await (Purchase as any).find()
+    // Calculate exact total inventory value (stock * lastPurchaseRate)
+    const inventoryValData = await (Item as any).aggregate([
+      { $match: { isDeleted: false } },
+      { $group: { 
+          _id: null, 
+          totalValue: { $sum: { $multiply: ['$currentStock', { $ifNull: ['$lastPurchaseRate', 0] }] } },
+          totalStockUnits: { $sum: '$currentStock' }
+        } 
+      }
+    ]);
+    const totalInventoryValue = Math.round(inventoryValData[0]?.totalValue || 0);
+    const totalStockUnits = inventoryValData[0]?.totalStockUnits || 0;
+
+    const recentPurchases = await (Purchase as any).find({ isDeleted: false })
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('vendor', 'name')
       .populate('createdBy', 'name');
 
-    const recentPayments = await (Payment as any).find()
+    const recentPayments = await (Payment as any).find({ isDeleted: false })
       .sort({ paymentDate: -1 })
       .limit(5)
       .populate('vendor', 'name')
       .populate('createdBy', 'name');
 
     const monthlyPurchases = await (Purchase as any).aggregate([
+      { $match: { isDeleted: false } },
       {
         $group: {
           _id: {
@@ -64,10 +88,12 @@ export async function GET(request: NextRequest) {
         stats: {
           totalVendors,
           totalPurchases,
-          pendingPayments,
+          pendingPayments: totalPendingPayable,
           lowStockItems,
-          totalPurchaseAmount: totalPurchaseAmount[0]?.total || 0,
-          totalPayments: totalPayments[0]?.total || 0,
+          totalPurchaseAmount,
+          totalPayments,
+          totalInventoryValue,
+          totalStockUnits,
         },
         recentPurchases,
         recentPayments,
