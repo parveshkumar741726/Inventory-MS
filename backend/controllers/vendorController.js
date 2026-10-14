@@ -14,7 +14,7 @@ exports.createVendor = async (req, res) => {
       address,
       gstNumber,
       openingBalance: openingBalance || 0,
-      openingBalanceType: openingBalanceType || 'debit',
+      openingBalanceType: openingBalanceType || 'credit',
       status: status || 'active',
       createdBy: req.user._id,
     });

@@ -483,63 +483,71 @@ export default function PurchasesPage() {
           setInvoiceFile(null);
         }}
         title="Create New Purchase Bill (GST Invoice)"
-        size="xl"
+        subtitle="Record vendor invoice, tax mode, and itemized lines with automatic GST breakdown"
+        icon={<Receipt className="w-5 h-5 text-indigo-400" />}
+        size="2xl"
       >
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6 text-slate-200">
           {/* Header Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                Vendor / Supplier *
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Vendor / Supplier *</span>
               </label>
               <select
                 {...register('vendor')}
-                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all shadow-inner"
               >
-                <option value="">Select Vendor</option>
+                <option value="" className="bg-slate-900 text-slate-400">Select Vendor</option>
                 {vendors?.map((v: any) => (
-                  <option key={v._id} value={v._id}>{v.name} ({v.firmName || 'Vendor'})</option>
+                  <option key={v._id} value={v._id} className="bg-slate-900 text-white">
+                    {v.name} ({v.firmName || 'Vendor'})
+                  </option>
                 ))}
               </select>
               {errors.vendor && <p className="mt-1 text-xs text-rose-400">{errors.vendor.message}</p>}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                Invoice Number *
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Invoice Number *</span>
               </label>
               <input
                 type="text"
                 placeholder="e.g. INV-2024-001"
                 {...register('invoiceNumber')}
-                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all shadow-inner"
               />
               {errors.invoiceNumber && <p className="mt-1 text-xs text-rose-400">{errors.invoiceNumber.message}</p>}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                Invoice Date *
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Invoice Date *</span>
               </label>
               <input
                 type="date"
                 {...register('invoiceDate')}
-                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all shadow-inner [color-scheme:dark]"
               />
             </div>
           </div>
 
           {/* Tax Mode Selector & File Upload */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-950/60 border border-slate-800 shadow-inner">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                GST Tax Calculation Mode *
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+                <span>GST Tax Calculation Mode *</span>
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs font-bold transition-all ${
                   selectedTaxType === 'exclusive'
-                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800/60 hover:border-slate-700'
                 }`}>
                   <input
                     type="radio"
@@ -552,8 +560,8 @@ export default function PurchasesPage() {
 
                 <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs font-bold transition-all ${
                   selectedTaxType === 'inclusive'
-                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800/60 hover:border-slate-700'
                 }`}>
                   <input
                     type="radio"
@@ -564,44 +572,55 @@ export default function PurchasesPage() {
                   <span>Inclusive (MRP includes GST)</span>
                 </label>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">
+              <p className="text-[11px] text-slate-400 mt-2 bg-slate-900/70 p-2 rounded-lg border border-slate-800/80">
                 {selectedTaxType === 'exclusive' 
-                  ? 'Rate is base price; GST tax is added on top.' 
-                  : 'Rate already includes GST tax; base taxable amount is extracted.'}
+                  ? '💡 Rate is base price; GST tax is added on top.' 
+                  : '💡 Rate already includes GST tax; base taxable amount is extracted.'}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                Attach Bill / Invoice Scan
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-1.5">
+                <Upload className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Attach Bill / Invoice Scan</span>
               </label>
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={(e) => setInvoiceFile(e.target.files?.[0] || null)}
-                className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-800 border border-slate-700 rounded-xl p-1"
+                className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-indigo-600 file:to-indigo-500 file:text-white hover:file:opacity-90 file:cursor-pointer cursor-pointer bg-slate-900/90 border border-slate-800 rounded-xl p-1.5 focus:outline-none"
               />
+              <p className="text-[11px] text-slate-500 mt-2">
+                Supported formats: PDF, JPG, PNG (Max 5MB)
+              </p>
             </div>
           </div>
 
           {/* Items Table */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Receipt className="w-4 h-4 text-indigo-400" />
-                Line Items
-              </h3>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Bill Line Items
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {formItems.length} {formItems.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={addItem}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/25 border border-indigo-500/40 transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Item
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
+            <div className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 pr-1">
               {formItems.map((item, index) => {
                 const qty = Number(item.quantity) || 0;
                 const rate = Number(item.rate) || 0;
@@ -615,47 +634,47 @@ export default function PurchasesPage() {
                   : netAfterDisc + (netAfterDisc * taxP) / 100;
 
                 return (
-                  <div key={index} className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 grid grid-cols-12 gap-2.5 items-center">
+                  <div key={index} className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-slate-700/80 grid grid-cols-12 gap-2.5 items-center transition-all shadow-sm">
                     <div className="col-span-12 sm:col-span-3">
-                      <label className="text-[10px] font-semibold text-slate-400">Item Name</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Item Name</label>
                       <input
                         type="text"
                         placeholder="Item Description"
                         value={item.itemName || ''}
                         onChange={(e) => updateItem(index, 'itemName', e.target.value)}
-                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
                     <div className="col-span-4 sm:col-span-2">
-                      <label className="text-[10px] font-semibold text-slate-400">Quantity</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Quantity</label>
                       <input
                         type="number"
                         min="1"
                         step="1"
                         value={item.quantity || ''}
                         onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
                     <div className="col-span-4 sm:col-span-1">
-                      <label className="text-[10px] font-semibold text-slate-400">Unit</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Unit</label>
                       <select
                         value={item.unit || 'pcs'}
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        className="w-full mt-0.5 px-1.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-1.5 py-1.5 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       >
-                        <option value="pcs">pcs</option>
-                        <option value="kg">kg</option>
-                        <option value="box">box</option>
-                        <option value="m">m</option>
-                        <option value="l">l</option>
+                        <option value="pcs" className="bg-slate-900">pcs</option>
+                        <option value="kg" className="bg-slate-900">kg</option>
+                        <option value="box" className="bg-slate-900">box</option>
+                        <option value="m" className="bg-slate-900">m</option>
+                        <option value="l" className="bg-slate-900">l</option>
                       </select>
                     </div>
 
                     <div className="col-span-4 sm:col-span-2">
-                      <label className="text-[10px] font-semibold text-slate-400">Rate (₹)</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Rate (₹)</label>
                       <input
                         type="number"
                         min="0"
@@ -663,12 +682,12 @@ export default function PurchasesPage() {
                         placeholder="0.00"
                         value={item.rate || ''}
                         onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
                     <div className="col-span-4 sm:col-span-1">
-                      <label className="text-[10px] font-semibold text-slate-400">Disc %</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Disc %</label>
                       <input
                         type="number"
                         min="0"
@@ -676,28 +695,28 @@ export default function PurchasesPage() {
                         value={item.discountPercent || ''}
                         placeholder="0"
                         onChange={(e) => updateItem(index, 'discountPercent', parseFloat(e.target.value) || 0)}
-                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-2 py-1.5 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
                     <div className="col-span-4 sm:col-span-1">
-                      <label className="text-[10px] font-semibold text-slate-400">GST %</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">GST %</label>
                       <select
                         value={item.taxPercent || 18}
                         onChange={(e) => updateItem(index, 'taxPercent', parseFloat(e.target.value) || 0)}
-                        className="w-full mt-0.5 px-1 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-1 py-1.5 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       >
-                        <option value="0">0%</option>
-                        <option value="5">5%</option>
-                        <option value="12">12%</option>
-                        <option value="18">18%</option>
-                        <option value="28">28%</option>
+                        <option value="0" className="bg-slate-900">0%</option>
+                        <option value="5" className="bg-slate-900">5%</option>
+                        <option value="12" className="bg-slate-900">12%</option>
+                        <option value="18" className="bg-slate-900">18%</option>
+                        <option value="28" className="bg-slate-900">28%</option>
                       </select>
                     </div>
 
                     <div className="col-span-3 sm:col-span-1 text-right">
-                      <label className="text-[10px] font-semibold text-slate-400 block">Total</label>
-                      <p className="text-xs font-bold text-white mt-1">₹{Math.round(rowTotal)}</p>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Total</label>
+                      <p className="text-xs font-black text-emerald-400">₹{Math.round(rowTotal).toLocaleString('en-IN')}</p>
                     </div>
 
                     <div className="col-span-1 text-center">
@@ -705,7 +724,8 @@ export default function PurchasesPage() {
                         <button
                           type="button"
                           onClick={() => removeItem(index)}
-                          className="text-rose-400 hover:text-rose-300 p-1"
+                          className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 border border-transparent hover:border-rose-500/30 transition-all"
+                          title="Remove item"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -718,59 +738,77 @@ export default function PurchasesPage() {
           </div>
 
           {/* LIVE BILL CALCULATION SUMMARY WIDGET */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-500/30 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 pb-2 border-b border-slate-800">
-              Invoice Calculation Summary (GST Breakdown)
-            </h4>
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 border border-indigo-500/30 shadow-xl space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <Receipt className="w-3.5 h-3.5 text-indigo-400" />
+                Invoice Calculation Summary (GST Breakdown)
+              </h4>
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Live Engine
+              </span>
+            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
-              <div>
-                <p className="text-slate-400">Gross Amount:</p>
-                <p className="font-semibold text-white">₹{billSummary.grossTotal.toLocaleString('en-IN')}</p>
+              <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                <p className="text-[11px] font-medium text-slate-400">Gross Amount</p>
+                <p className="text-sm font-bold text-white mt-0.5">₹{billSummary.grossTotal.toLocaleString('en-IN')}</p>
               </div>
-              <div>
-                <p className="text-slate-400">Total Discount:</p>
-                <p className="font-semibold text-amber-400">-₹{billSummary.totalDiscount.toLocaleString('en-IN')}</p>
+              <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                <p className="text-[11px] font-medium text-slate-400">Total Discount</p>
+                <p className="text-sm font-bold text-amber-400 mt-0.5">-₹{billSummary.totalDiscount.toLocaleString('en-IN')}</p>
               </div>
-              <div>
-                <p className="text-slate-400">Taxable Value:</p>
-                <p className="font-semibold text-white">₹{billSummary.taxableAmount.toLocaleString('en-IN')}</p>
+              <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                <p className="text-[11px] font-medium text-slate-400">Taxable Value</p>
+                <p className="text-sm font-bold text-white mt-0.5">₹{billSummary.taxableAmount.toLocaleString('en-IN')}</p>
               </div>
-              <div>
-                <p className="text-slate-400">Total GST Tax:</p>
-                <p className="font-semibold text-indigo-400">+₹{billSummary.totalTax.toLocaleString('en-IN')}</p>
+              <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                <p className="text-[11px] font-medium text-slate-400">Total GST Tax</p>
+                <p className="text-sm font-bold text-cyan-400 mt-0.5">+₹{billSummary.totalTax.toLocaleString('en-IN')}</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
-              <div className="text-xs text-slate-400">
-                <span>Round Off: </span>
-                <span className="font-semibold text-slate-300">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="text-xs text-slate-400 flex items-center gap-2">
+                <span className="font-medium">Round Off:</span>
+                <span className="font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
                   {billSummary.roundOff >= 0 ? `+₹${billSummary.roundOff}` : `-₹${Math.abs(billSummary.roundOff)}`}
                 </span>
               </div>
-              <div className="text-right">
-                <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold mr-2">Grand Total:</span>
-                <span className="text-2xl font-black text-emerald-400">₹{billSummary.grandTotal.toLocaleString('en-IN')}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 uppercase tracking-wider font-bold">Grand Total:</span>
+                <span className="text-2xl font-black text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.35)]">
+                  ₹{billSummary.grandTotal.toLocaleString('en-IN')}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-750 transition-colors"
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+              className="px-7 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/40 transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              {createMutation.isPending ? 'Saving Invoice...' : 'Confirm & Save Purchase Bill'}
+              {createMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving Invoice...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm & Save Purchase Bill</span>
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -784,38 +822,46 @@ export default function PurchasesPage() {
           setSelectedPurchase(null);
         }}
         title="Record Supplier Payment"
+        subtitle="Settle outstanding invoice balance"
+        icon={<CreditCard className="w-5 h-5 text-emerald-400" />}
         size="md"
       >
         {selectedPurchase && (
           <div className="p-6 space-y-4 text-slate-200">
-            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1.5 text-sm">
-              <p className="text-slate-400">Vendor: <span className="font-bold text-white">{selectedPurchase.vendor?.name}</span></p>
-              <p className="text-slate-400">Invoice: <span className="font-semibold text-white">#{selectedPurchase.invoiceNumber}</span></p>
-              <div className="flex items-center justify-between pt-2 border-t border-slate-700/60 mt-2">
-                <span className="text-slate-400">Pending Payable:</span>
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2 text-sm shadow-inner">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Vendor</span>
+                <span className="font-bold text-white">{selectedPurchase.vendor?.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Invoice Ref</span>
+                <span className="font-mono font-semibold text-indigo-400">#{selectedPurchase.invoiceNumber}</span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800 mt-2">
+                <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Pending Payable</span>
                 <span className="text-lg font-black text-rose-400">₹{selectedPurchase.pendingAmount?.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                Payment Amount (₹)
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
+                <span>Payment Amount (₹)</span>
+                <span className="text-[11px] text-slate-500 lowercase font-normal">Max: ₹{selectedPurchase.pendingAmount?.toLocaleString('en-IN')}</span>
               </label>
               <input
                 type="number"
                 id="modalPaymentAmount"
                 defaultValue={selectedPurchase.pendingAmount}
                 max={selectedPurchase.pendingAmount}
-                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all shadow-inner"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Maximum payable: ₹{selectedPurchase.pendingAmount?.toLocaleString('en-IN')}</p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsPaymentModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>

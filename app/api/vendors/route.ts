@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       address,
       gstNumber,
       openingBalance: openingBalance || 0,
-      openingBalanceType: openingBalanceType || 'debit',
+      openingBalanceType: openingBalanceType || 'credit',
       status: status || 'active',
       createdBy: user!._id,
     });

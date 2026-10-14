@@ -18,14 +18,14 @@ const createLedgerEntry = async (vendorId, type, amount, reference, referenceId,
         credit = vendor.openingBalance;
       }
     } else if (type === 'purchase') {
-      debit = amount;
-    } else if (type === 'payment') {
       credit = amount;
+    } else if (type === 'payment') {
+      debit = amount;
     } else if (type === 'adjustment') {
       if (amount >= 0) {
-        debit = amount;
+        credit = amount;
       } else {
-        credit = Math.abs(amount);
+        debit = Math.abs(amount);
       }
     }
 
@@ -55,14 +55,14 @@ const calculateVendorBalance = async (vendorId) => {
     }
 
     const ledgerEntries = await Ledger.find({ 
-      vendor: vendorId,
+      vendor: vendorId, 
       isDeleted: false 
     }).sort({ date: 1, createdAt: 1 });
 
     let balance = 0;
     
     ledgerEntries.forEach(entry => {
-      balance += entry.debit - entry.credit;
+      balance += entry.credit - entry.debit;
     });
 
     return balance;
@@ -80,7 +80,7 @@ const getLedgerWithBalance = async (vendorId, filters = {}) => {
 
     let runningBalance = 0;
     const entriesWithBalance = ledgerEntries.map(entry => {
-      runningBalance += entry.debit - entry.credit;
+      runningBalance += entry.credit - entry.debit;
       return {
         ...entry.toObject(),
         runningBalance,

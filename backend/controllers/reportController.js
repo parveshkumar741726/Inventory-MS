@@ -231,7 +231,7 @@ exports.getLedgerReport = async (req, res) => {
 
     let runningBalance = 0;
     const entriesWithBalance = ledgerEntries.map(entry => {
-      runningBalance += entry.debit - entry.credit;
+      runningBalance += entry.credit - entry.debit;
       return {
         ...entry.toObject(),
         runningBalance,

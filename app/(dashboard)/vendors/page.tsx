@@ -36,7 +36,7 @@ const vendorSchema = z.object({
   address: z.string().optional(),
   gstNumber: z.string().optional(),
   openingBalance: z.number().min(0).optional(),
-  openingBalanceType: z.enum(['debit', 'credit']).default('debit'),
+  openingBalanceType: z.enum(['debit', 'credit']).default('credit'),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -639,8 +639,8 @@ export default function VendorsPage() {
                       {...register('openingBalanceType')}
                       className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
-                      <option value="debit">Debit (To Pay / Due)</option>
-                      <option value="credit">Credit (Advance Paid)</option>
+                      <option value="credit">Credit (Amount Due / Payable to Vendor)</option>
+                      <option value="debit">Debit (Advance Paid to Vendor)</option>
                     </select>
                   </div>
                 </div>

@@ -1,4 +1,9 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+} catch (e) {}
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 

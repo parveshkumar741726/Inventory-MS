@@ -202,7 +202,7 @@ export async function GET(
 
       let runningBalance = 0;
       const entriesWithBalance = ledgerEntries.map((entry: any) => {
-        runningBalance += entry.debit - entry.credit;
+        runningBalance += entry.credit - entry.debit;
         return {
           ...entry.toObject(),
           runningBalance,

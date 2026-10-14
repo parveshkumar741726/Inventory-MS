@@ -57,7 +57,7 @@ export default function LedgerPage() {
   const summary = useMemo(() => {
     const totalDebit = filteredEntries.reduce((sum: number, e: any) => sum + (e.debit || 0), 0);
     const totalCredit = filteredEntries.reduce((sum: number, e: any) => sum + (e.credit || 0), 0);
-    const netBalance = totalDebit - totalCredit;
+    const netBalance = totalCredit - totalDebit; // Credit (Invoices/Payables) - Debit (Payments)
     return { totalDebit, totalCredit, netBalance, count: filteredEntries.length };
   }, [filteredEntries]);
 
@@ -79,7 +79,7 @@ export default function LedgerPage() {
             General Account Ledger
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Complete debit/credit transaction book and running balances across all suppliers
+            Complete debit/credit transaction statement and running balances across all suppliers
           </p>
         </div>
 
@@ -103,26 +103,26 @@ export default function LedgerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Debits (+)</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Credits (Cr)</span>
             <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 text-2xl font-black text-rose-400">
-            ₹{Math.round(summary.totalDebit).toLocaleString('en-IN')}
+            ₹{Math.round(summary.totalCredit).toLocaleString('en-IN')}
           </div>
           <span className="text-xs text-slate-400 font-medium">Purchases & Invoices Added</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Credits (-)</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Debits (Dr)</span>
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <TrendingDown className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 text-2xl font-black text-emerald-400">
-            ₹{Math.round(summary.totalCredit).toLocaleString('en-IN')}
+            ₹{Math.round(summary.totalDebit).toLocaleString('en-IN')}
           </div>
           <span className="text-xs text-slate-400 font-medium">Payments & Settlements Cleared</span>
         </div>
@@ -138,7 +138,7 @@ export default function LedgerPage() {
             ₹{Math.abs(Math.round(summary.netBalance)).toLocaleString('en-IN')}
           </div>
           <span className="text-xs text-slate-400 font-medium">
-            {summary.netBalance > 0 ? 'Net Outstanding Payable' : 'Net Advance Credit'}
+            {summary.netBalance > 0 ? 'Net Outstanding Payable (Cr)' : summary.netBalance < 0 ? 'Net Advance Credit (Dr)' : 'Settled (₹0)'}
           </span>
         </div>
 
@@ -181,7 +181,7 @@ export default function LedgerPage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              className="w-full px-3 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 [color-scheme:dark]"
             />
           </div>
 
@@ -193,7 +193,7 @@ export default function LedgerPage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              className="w-full px-3 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 [color-scheme:dark]"
             />
           </div>
 
@@ -207,9 +207,9 @@ export default function LedgerPage() {
               className="w-full px-3 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             >
               <option value="all">All Types</option>
-              <option value="purchase">Purchases (Debits)</option>
-              <option value="payment">Payments (Credits)</option>
-              <option value="opening">Opening Balance</option>
+              <option value="purchase">Purchases / Invoices (Credit)</option>
+              <option value="payment">Payments / Disbursals (Debit)</option>
+              <option value="opening">Opening Balances</option>
             </select>
           </div>
         </div>
@@ -231,14 +231,14 @@ export default function LedgerPage() {
                   <th className="px-5 py-3.5 font-bold">Vendor Name</th>
                   <th className="px-5 py-3.5 font-bold text-center">Type</th>
                   <th className="px-5 py-3.5 font-bold">Reference / Particulars</th>
-                  <th className="px-5 py-3.5 font-bold text-right">Debit (+)</th>
-                  <th className="px-5 py-3.5 font-bold text-right">Credit (-)</th>
-                  <th className="px-5 py-3.5 font-bold text-right">Running Balance</th>
+                  <th className="px-5 py-3.5 font-bold text-right text-emerald-400">Debit (Dr) - Payments</th>
+                  <th className="px-5 py-3.5 font-bold text-right text-rose-400">Credit (Cr) - Invoices</th>
+                  <th className="px-5 py-3.5 font-bold text-right text-indigo-300">Running Balance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {filteredEntries.map((row: any) => {
-                  const runningBal = row.runningBalance || row.balance || 0;
+                  const runningBal = row.runningBalance !== undefined ? row.runningBalance : (row.balance !== undefined ? row.balance : 0);
                   return (
                     <tr key={row._id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-400">
@@ -252,7 +252,7 @@ export default function LedgerPage() {
                       <td className="px-5 py-3.5 text-center whitespace-nowrap">
                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                           row.type === 'purchase'
-                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                             : row.type === 'payment'
                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -265,11 +265,11 @@ export default function LedgerPage() {
                         {row.reference || row.description || '-'}
                       </td>
 
-                      <td className="px-5 py-3.5 text-right font-bold text-rose-400 whitespace-nowrap">
+                      <td className="px-5 py-3.5 text-right font-bold text-emerald-400 whitespace-nowrap">
                         {row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '-'}
                       </td>
 
-                      <td className="px-5 py-3.5 text-right font-bold text-emerald-400 whitespace-nowrap">
+                      <td className="px-5 py-3.5 text-right font-bold text-rose-400 whitespace-nowrap">
                         {row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '-'}
                       </td>
 
@@ -277,8 +277,14 @@ export default function LedgerPage() {
                         <span className={`font-extrabold ${runningBal > 0 ? 'text-rose-400' : runningBal < 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
                           ₹{Math.abs(runningBal).toLocaleString('en-IN')}
                         </span>
-                        <span className="text-[10px] text-slate-500 ml-1 font-semibold uppercase">
-                          {runningBal > 0 ? 'Dr' : runningBal < 0 ? 'Cr' : ''}
+                        <span className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded font-bold uppercase ${
+                          runningBal > 0 
+                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                            : runningBal < 0 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : 'text-slate-500'
+                        }`}>
+                          {runningBal > 0 ? 'Cr' : runningBal < 0 ? 'Dr' : 'Nil'}
                         </span>
                       </td>
                     </tr>

@@ -403,30 +403,54 @@ export default function VendorDetailPage() {
               <thead className="text-xs uppercase bg-slate-800/60 text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="px-5 py-3 font-bold">Date</th>
-                  <th className="px-5 py-3 font-bold">Type</th>
+                  <th className="px-5 py-3 font-bold text-center">Type</th>
                   <th className="px-5 py-3 font-bold">Reference / Particulars</th>
-                  <th className="px-5 py-3 font-bold text-right">Debit (+)</th>
-                  <th className="px-5 py-3 font-bold text-right">Credit (-)</th>
-                  <th className="px-5 py-3 font-bold text-right">Running Balance</th>
+                  <th className="px-5 py-3 font-bold text-right text-emerald-400">Debit (Dr) - Payments</th>
+                  <th className="px-5 py-3 font-bold text-right text-rose-400">Credit (Cr) - Invoices</th>
+                  <th className="px-5 py-3 font-bold text-right text-indigo-300">Running Balance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {(ledger || []).map((row: any) => (
-                  <tr key={row._id} className="hover:bg-slate-800/40">
-                    <td className="px-5 py-3.5 text-xs text-slate-400">{format(new Date(row.date), 'dd MMM yyyy')}</td>
-                    <td className="px-5 py-3.5 uppercase text-xs font-bold text-indigo-300">{row.type}</td>
-                    <td className="px-5 py-3.5 text-xs text-slate-300">{row.reference || row.description || '-'}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-rose-400">
-                      {row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '-'}
-                    </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-emerald-400">
-                      {row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '-'}
-                    </td>
-                    <td className="px-5 py-3.5 text-right font-extrabold text-white">
-                      ₹{Math.abs(row.runningBalance || row.balance || 0).toLocaleString('en-IN')}
-                    </td>
-                  </tr>
-                ))}
+                {(ledger || []).map((row: any) => {
+                  const runningBal = row.runningBalance !== undefined ? row.runningBalance : (row.balance !== undefined ? row.balance : 0);
+                  return (
+                    <tr key={row._id} className="hover:bg-slate-800/40">
+                      <td className="px-5 py-3.5 text-xs text-slate-400">{format(new Date(row.date), 'dd MMM yyyy')}</td>
+                      <td className="px-5 py-3.5 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
+                          row.type === 'purchase'
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : row.type === 'payment'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        }`}>
+                          {row.type}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs text-slate-300">{row.reference || row.description || '-'}</td>
+                      <td className="px-5 py-3.5 text-right font-bold text-emerald-400">
+                        {row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '-'}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-bold text-rose-400">
+                        {row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '-'}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-extrabold whitespace-nowrap">
+                        <span className={runningBal > 0 ? 'text-rose-400' : runningBal < 0 ? 'text-emerald-400' : 'text-slate-400'}>
+                          ₹{Math.abs(runningBal).toLocaleString('en-IN')}
+                        </span>
+                        <span className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded font-bold uppercase ${
+                          runningBal > 0 
+                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                            : runningBal < 0 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : 'text-slate-500'
+                        }`}>
+                          {runningBal > 0 ? 'Cr' : runningBal < 0 ? 'Dr' : 'Nil'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -41,18 +41,36 @@ exports.getAllLedgers = async (req, res) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const ledgerEntries = await Ledger.find(query)
-      .sort({ date: -1, createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+    const allMatchingEntries = await Ledger.find(query)
+      .sort({ date: 1, createdAt: 1 })
       .populate('vendor')
       .populate('createdBy', 'name email');
 
-    const count = await Ledger.countDocuments(query);
+    const vendorBalances = {};
+    let cumulativeBalance = 0;
+
+    const entriesWithBalance = allMatchingEntries.map((entry) => {
+      const cr = entry.credit || 0;
+      const dr = entry.debit || 0;
+      cumulativeBalance += (cr - dr);
+      
+      const vId = entry.vendor?._id?.toString() || 'unknown';
+      vendorBalances[vId] = (vendorBalances[vId] || 0) + (cr - dr);
+
+      return {
+        ...entry.toObject(),
+        runningBalance: vendorBalances[vId],
+        cumulativeBalance,
+      };
+    });
+
+    const count = allMatchingEntries.length;
+    const sortedEntries = [...entriesWithBalance].reverse();
+    const paginatedEntries = sortedEntries.slice((page - 1) * limit, page * limit);
 
     res.status(200).json({
       success: true,
-      data: ledgerEntries,
+      data: paginatedEntries,
       pagination: {
         total: count,
         page: parseInt(page),
